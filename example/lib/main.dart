@@ -1,0 +1,92 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:flutter_bluetooth_serial_plus/flutter_bluetooth_serial_plus.dart';
+import 'package:flutter_bluetooth_serial_plus/flutter_bluetooth_serial_plus_models.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final _bluetoothPlugin = FlutterBluetoothSerialPlus.instance;
+  List<BluetoothDevice> _devices = [];
+
+  @override
+  void initState() {
+    super.initState();
+    initScanDevices();
+  }
+
+  Future<void> initScanDevices() async {
+    var devices = await _bluetoothPlugin.scanDevices();
+
+    setState(() {
+      _devices = devices;
+    });
+  }
+
+  Future<void> connectDevice(BluetoothDevice device) async {
+    if (await _bluetoothPlugin.connect(device)) {
+      print("Connection successfull");
+    } else {
+      print("Connection failed");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Plugin example app'),
+        ),
+        body: Column(children: [
+          Expanded(
+            child: ListView.builder(
+              itemCount: _devices.length,
+              itemBuilder: (context, index) {
+                var item = _devices[index];
+
+                return ListTile(
+                  title: Text(item.name),
+                  subtitle: Text(item.address),
+                  selected: item.connected,
+                  onTap: () => connectDevice(item),
+                );
+              },
+            ),
+          )
+        ]),
+        floatingActionButton: FloatingActionButton(
+          child: const Icon(Icons.print),
+          onPressed: () async {
+            print(await _bluetoothPlugin.write(Uint8List.fromList([
+              //Disable chinese char
+              0x1C,
+              0x2E,
+              0x1B,
+              0x74,
+              0x10,
+              //Others
+              0x1B, 0x21, 0x08,
+              0x1b, 0x4d, 0x00,
+              0x1B, 0x61, 0x01,
+              ...latin1.encode('AÃeéÕõçÇ'),
+              0x0A,
+            ])));
+          },
+        ),
+      ),
+    );
+  }
+}
