@@ -1,12 +1,25 @@
 package com.flutter.lucassouza.buetooth.serial.flutter_bluetooth_serial_plus;
 
+import android.Manifest;
+import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.os.Build;
+
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 public class FlutterBluetoothSerialPlusFunctions {
     private FlutterBluetoothSerialPlusService service = new FlutterBluetoothSerialPlusService();
@@ -16,16 +29,7 @@ public class FlutterBluetoothSerialPlusFunctions {
         List<Map<String, Object>> result = new ArrayList<>();
 
         for (BluetoothDevice device: devices) {
-            Map<String, Object> item = new HashMap<>();
-
-            boolean connected = service.mmDevice != null &&
-                    service.mmDevice.getAddress().equals(device.getAddress());
-
-            item.put("name", device.getName());
-            item.put("address", device.getAddress());
-            item.put("connected", connected);
-
-            result.add(item);
+            result.add(FlutterBluetoothSerialPlusMapUtils.bluetoothDeviceToMap(device));
         }
 
         return result;
@@ -38,9 +42,7 @@ public class FlutterBluetoothSerialPlusFunctions {
             return false;
         } else {
             try {
-                service.connect(device);
-
-                return true;
+                return service.connect(device);
             } catch (IOException e) {
                 return false;
             }
@@ -66,5 +68,38 @@ public class FlutterBluetoothSerialPlusFunctions {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public boolean checkPermissions(Activity activity) {
+        return ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    public boolean requestPermissions(Activity activity) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        {
+            ActivityCompat.requestPermissions(activity, new String[]{
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_CONNECT
+            }, 2);
+        }
+
+        return true;
+    }
+
+    public Map<String, Object> connectedDevice(){
+        BluetoothDevice actual = service.connectedDevice();
+
+        if(actual == null) return null;
+
+        return FlutterBluetoothSerialPlusMapUtils.bluetoothDeviceToMap(actual);
+    }
+
+    public boolean bluetoothEnabled (){
+        return service.bluetoothEnabled();
+    }
+
+    public void enableBluetooth (Activity activity, FlutterBluetoothSerialPlusService.EnableBluetoothCallback callback){
+        service.enableBluetooth(activity, callback);
     }
 }

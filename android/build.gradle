@@ -40,6 +40,7 @@ android {
     dependencies {
         testImplementation 'junit:junit:4.13.2'
         testImplementation 'org.mockito:mockito-core:5.0.0'
+        implementation 'androidx.appcompat:appcompat:1.1.0'
         //implementation files('C:/flutter/bin/cache/artifacts/engine/android-arm64-release/flutter.jar')
 
     }

@@ -20,14 +20,46 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final _bluetoothPlugin = FlutterBluetoothSerialPlus.instance;
   List<BluetoothDevice> _devices = [];
+  BluetoothDevice? _connected;
 
   @override
   void initState() {
     super.initState();
+
+    _bluetoothPlugin.state.listen(
+      (event) {
+        switch (event.state) {
+          case BluetoothStateEvent.connect:
+            print('Connected device');
+            setState(() => _connected = event.device);
+            break;
+          case BluetoothStateEvent.disconnect:
+            print('Disconnected device');
+            setState(() => _connected = null);
+            break;
+          case BluetoothStateEvent.on:
+            print('Bluetooth on');
+            break;
+          case BluetoothStateEvent.off:
+            print('Bluetooth off');
+            setState(() => _connected = null);
+            break;
+        }
+      },
+    );
+
     initScanDevices();
   }
 
   Future<void> initScanDevices() async {
+    if (!await _bluetoothPlugin.checkPermissions()) {
+      _bluetoothPlugin.requestPermissions();
+
+      if (!await _bluetoothPlugin.bluetoothEnabled()) {
+        print(await _bluetoothPlugin.enableBluetooth());
+      }
+    }
+
     var devices = await _bluetoothPlugin.scanDevices();
 
     setState(() {
@@ -38,6 +70,7 @@ class _MyAppState extends State<MyApp> {
   Future<void> connectDevice(BluetoothDevice device) async {
     if (await _bluetoothPlugin.connect(device)) {
       print("Connection successfull");
+      initScanDevices();
     } else {
       print("Connection failed");
     }
@@ -60,7 +93,7 @@ class _MyAppState extends State<MyApp> {
                 return ListTile(
                   title: Text(item.name),
                   subtitle: Text(item.address),
-                  selected: item.connected,
+                  selected: _connected == item,
                   onTap: () => connectDevice(item),
                 );
               },
@@ -70,6 +103,7 @@ class _MyAppState extends State<MyApp> {
         floatingActionButton: FloatingActionButton(
           child: const Icon(Icons.print),
           onPressed: () async {
+            // await _bluetoothPlugin.disconnect();
             print(await _bluetoothPlugin.write(Uint8List.fromList([
               //Disable chinese char
               0x1C,
