@@ -19,7 +19,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public class FlutterBluetoothSerialPlusService {
-
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothSocket mmSocket;
     private BluetoothDevice mmDevice;
