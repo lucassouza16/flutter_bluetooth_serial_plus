@@ -2,12 +2,7 @@ package com.flutter.lucassouza.buetooth.serial.flutter_bluetooth_serial_plus;
 
 import android.Manifest;
 import android.app.Activity;
-import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 
@@ -16,15 +11,13 @@ import androidx.core.content.ContextCompat;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 public class FlutterBluetoothSerialPlusFunctions {
     private FlutterBluetoothSerialPlusService service = new FlutterBluetoothSerialPlusService();
 
-    public List<Map<String, Object>> scanDevices () {
+    public List<Map<String, Object>> listDevices() {
         List<BluetoothDevice> devices = service.list();
         List<Map<String, Object>> result = new ArrayList<>();
 
@@ -70,7 +63,7 @@ public class FlutterBluetoothSerialPlusFunctions {
         }
     }
 
-    public boolean checkPermissions(Activity activity) {
+    public boolean hasPermissions(Activity activity) {
         return ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
                 ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
     }
@@ -95,7 +88,7 @@ public class FlutterBluetoothSerialPlusFunctions {
         return FlutterBluetoothSerialPlusMapUtils.bluetoothDeviceToMap(actual);
     }
 
-    public boolean bluetoothEnabled (){
+    public boolean isBluetoothEnabled(){
         return service.bluetoothEnabled();
     }
 

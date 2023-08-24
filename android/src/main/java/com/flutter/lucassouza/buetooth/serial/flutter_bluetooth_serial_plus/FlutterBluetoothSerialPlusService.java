@@ -26,24 +26,23 @@ public class FlutterBluetoothSerialPlusService {
     private OutputStream mmOutputStream;
     private InputStream mmInputStream;
     private Thread workerThread;
+    UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
     private static final String TAG = FlutterBluetoothSerialPlusService.class.getSimpleName();
 
     public FlutterBluetoothSerialPlusService() {
 
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        workerThread = new Thread(new Runnable() {
-            public void run() {
-                while (!Thread.currentThread().isInterrupted()) {
-                   /* if(isConnected) {
-                         try{
-                             disconnect();
-                             Log.d(TAG, "Connection to device lost, closing...");
-                         } catch (IOException e) {
-                             e.printStackTrace();
-                         }
-                    }*/
-                }
+        workerThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+               /* if(isConnected) {
+                     try{
+                         disconnect();
+                         Log.d(TAG, "Connection to device lost, closing...");
+                     } catch (IOException e) {
+                         e.printStackTrace();
+                     }
+                }*/
             }
         });
 
@@ -71,8 +70,6 @@ public class FlutterBluetoothSerialPlusService {
 
         if (mmDevice != null) return false;
 
-        UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
-
         mmDevice = device;
         mmSocket = mmDevice.createRfcommSocketToServiceRecord(uuid);
         mmSocket.connect();
@@ -99,6 +96,9 @@ public class FlutterBluetoothSerialPlusService {
     }
 
     public void disconnect() throws IOException {
+
+        if(mmDevice == null) return;
+
         mmDevice = null;
         mmOutputStream.close();
         mmInputStream.close();

@@ -52,15 +52,15 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> initScanDevices() async {
-    if (!await _bluetoothPlugin.checkPermissions()) {
+    if (!await _bluetoothPlugin.hasPermissions) {
       _bluetoothPlugin.requestPermissions();
 
-      if (!await _bluetoothPlugin.bluetoothEnabled()) {
+      if (!await _bluetoothPlugin.isBluetoothEnabled) {
         print(await _bluetoothPlugin.enableBluetooth());
       }
     }
 
-    var devices = await _bluetoothPlugin.scanDevices();
+    var devices = await _bluetoothPlugin.listDevices;
 
     setState(() {
       _devices = devices;
@@ -70,7 +70,6 @@ class _MyAppState extends State<MyApp> {
   Future<void> connectDevice(BluetoothDevice device) async {
     if (await _bluetoothPlugin.connect(device)) {
       print("Connection successfull");
-      initScanDevices();
     } else {
       print("Connection failed");
     }
@@ -111,11 +110,13 @@ class _MyAppState extends State<MyApp> {
               0x1B,
               0x74,
               0x10,
-              //Others
+              //font, size, etc
               0x1B, 0x21, 0x08,
               0x1b, 0x4d, 0x00,
               0x1B, 0x61, 0x01,
+              //text
               ...latin1.encode('AÃeéÕõçÇ'),
+              //feed line
               0x0A,
             ])));
           },

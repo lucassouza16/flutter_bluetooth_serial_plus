@@ -4,26 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bluetooth_serial_plus/flutter_bluetooth_serial_plus_models.dart';
 
 class FlutterBluetoothSerialPlus {
-  FlutterBluetoothSerialPlus() {
-    methodChannel.setMethodCallHandler(nativeMethodCallHandler);
-  }
-
   final methodChannel = const MethodChannel('flutter_bluetooth_serial_plus');
 
   static final FlutterBluetoothSerialPlus instance = FlutterBluetoothSerialPlus();
 
-  final StreamController<BluetoothStateEvent> _state = StreamController.broadcast();
+  final EventChannel _state = const EventChannel("flutter_bluetooth_serial_plus/stateChannel");
 
-  Future<dynamic> nativeMethodCallHandler(MethodCall methodCall) async {
-    switch (methodCall.method) {
-      case 'onStateChange':
-        _state.add(BluetoothStateEvent.fromMap(methodCall.arguments));
-        break;
-    }
-  }
-
-  Future<List<BluetoothDevice>> scanDevices() async {
-    final devices = await methodChannel.invokeMethod<List<dynamic>>('scanDevices');
+  Future<List<BluetoothDevice>> get listDevices async {
+    final devices = await methodChannel.invokeMethod<List<dynamic>>('listDevices');
 
     return BluetoothDevice.fromListMap(devices ?? []);
   }
@@ -40,23 +28,19 @@ class FlutterBluetoothSerialPlus {
     return await methodChannel.invokeMethod<bool>('write', bytes) ?? false;
   }
 
-  Future<bool> checkPermissions() async {
-    return await methodChannel.invokeMethod<bool>('checkPermissions') ?? false;
-  }
+  Future<bool> get hasPermissions async => await methodChannel.invokeMethod<bool>('hasPermissions') ?? false;
 
   Future<bool> requestPermissions() async {
     return await methodChannel.invokeMethod<bool>('requestPermissions') ?? false;
   }
 
-  Future<bool> bluetoothEnabled() async {
-    return await methodChannel.invokeMethod<bool>('bluetoothEnabled') ?? false;
-  }
+  Future<bool> get isBluetoothEnabled async => await methodChannel.invokeMethod<bool>('isBluetoothEnabled') ?? false;
 
   Future<bool> enableBluetooth() async {
     return await methodChannel.invokeMethod<bool>('enableBluetooth') ?? false;
   }
 
-  Future<BluetoothDevice?> connectedDevice() async {
+  Future<BluetoothDevice?> get connectedDevice async {
     var device = await methodChannel.invokeMethod<dynamic>('connectedDevice');
 
     if (device != null) {
@@ -66,5 +50,5 @@ class FlutterBluetoothSerialPlus {
     }
   }
 
-  Stream<BluetoothStateEvent> get state => _state.stream;
+  Stream<BluetoothStateEvent> get state => _state.receiveBroadcastStream().map((event) => BluetoothStateEvent.fromMap(event));
 }
