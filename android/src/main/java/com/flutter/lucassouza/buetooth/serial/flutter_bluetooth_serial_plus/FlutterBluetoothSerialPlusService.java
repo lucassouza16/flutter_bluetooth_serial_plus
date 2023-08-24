@@ -92,6 +92,9 @@ public class FlutterBluetoothSerialPlusService {
     }
 
     public void write(byte[] bytes) throws IOException {
+
+        if(mmDevice == null) return;
+
         mmOutputStream.write(bytes);
     }
 

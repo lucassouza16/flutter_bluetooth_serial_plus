@@ -80,10 +80,10 @@ public class FlutterBluetoothSerialPlusPlugin implements
         @Override
         public void onListen(Object o, EventChannel.EventSink eventSink) {
             sink = eventSink;
-            activity.registerReceiver(bluetoothDeviceReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED));
-            activity.registerReceiver(bluetoothDeviceReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED));
-            activity.registerReceiver(bluetoothDeviceReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED));
-            activity.registerReceiver(bluetoothDeviceReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+            context.registerReceiver(bluetoothDeviceReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED));
+            context.registerReceiver(bluetoothDeviceReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED));
+            context.registerReceiver(bluetoothDeviceReceiver, new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED));
+            context.registerReceiver(bluetoothDeviceReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
         }
 
         @Override
