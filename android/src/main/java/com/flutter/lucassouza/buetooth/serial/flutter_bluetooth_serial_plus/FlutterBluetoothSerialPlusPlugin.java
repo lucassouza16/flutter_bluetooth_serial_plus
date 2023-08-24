@@ -25,8 +25,8 @@ public class FlutterBluetoothSerialPlusPlugin implements
     Context context;
     private MethodChannel channel;
     private EventChannel eventStateChannel;
-    private FlutterBluetoothSerialPlusFunctions functions;
     private Activity activity;
+    private FlutterBluetoothSerialPlusFunctions functions = new FlutterBluetoothSerialPlusFunctions();
     private static final String TAG = FlutterBluetoothSerialPlusPlugin.class.getSimpleName();
     private final EventChannel.StreamHandler stateStreamHandler = new EventChannel.StreamHandler(){
 
@@ -105,8 +105,6 @@ public class FlutterBluetoothSerialPlusPlugin implements
         eventStateChannel.setStreamHandler(stateStreamHandler);
 
         channel.setMethodCallHandler(this);
-
-        functions = new FlutterBluetoothSerialPlusFunctions();
     }
 
     @Override
