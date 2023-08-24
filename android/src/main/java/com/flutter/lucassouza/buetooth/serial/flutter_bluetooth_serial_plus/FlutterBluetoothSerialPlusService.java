@@ -50,12 +50,15 @@ public class FlutterBluetoothSerialPlusService {
     }
 
     public List<BluetoothDevice> list() {
+
+        List<BluetoothDevice> devices = new ArrayList();
+
         if (mBluetoothAdapter == null) {
             Log.d(TAG, "No bluetooth adapter available");
+            return devices;
         }
 
         Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
-        List<BluetoothDevice> devices = new ArrayList();
 
         if (pairedDevices.size() > 0) {
             for (BluetoothDevice device : pairedDevices) {
@@ -109,7 +112,11 @@ public class FlutterBluetoothSerialPlusService {
     }
 
     public boolean bluetoothEnabled() {
-       return mBluetoothAdapter.isEnabled();
+       if(mBluetoothAdapter == null) {
+           return false;
+       }
+
+        return mBluetoothAdapter.isEnabled();
     }
 
     public BluetoothDevice connectedDevice() {
@@ -122,6 +129,12 @@ public class FlutterBluetoothSerialPlusService {
     }
 
     public void enableBluetooth(Activity activity, EnableBluetoothCallback callback) {
+
+        if(mBluetoothAdapter == null) {
+            callback.execute(false);
+            return;
+        }
+
         final BroadcastReceiver bluetoothStateReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
