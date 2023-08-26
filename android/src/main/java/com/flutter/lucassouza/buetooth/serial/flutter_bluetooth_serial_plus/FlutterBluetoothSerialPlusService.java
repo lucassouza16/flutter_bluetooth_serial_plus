@@ -24,28 +24,11 @@ public class FlutterBluetoothSerialPlusService {
     private BluetoothDevice mmDevice;
     private OutputStream mmOutputStream;
     private InputStream mmInputStream;
-    private Thread workerThread;
     UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
     private static final String TAG = FlutterBluetoothSerialPlusService.class.getSimpleName();
 
     public FlutterBluetoothSerialPlusService() {
-
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-
-        workerThread = new Thread(() -> {
-            while (!Thread.currentThread().isInterrupted()) {
-               /* if(isConnected) {
-                     try{
-                         disconnect();
-                         Log.d(TAG, "Connection to device lost, closing...");
-                     } catch (IOException e) {
-                         e.printStackTrace();
-                     }
-                }*/
-            }
-        });
-
-        workerThread.start();
     }
 
     public List<BluetoothDevice> list() {
@@ -72,11 +55,11 @@ public class FlutterBluetoothSerialPlusService {
 
         if (mmDevice != null) return false;
 
-        mmDevice = device;
-        mmSocket = mmDevice.createRfcommSocketToServiceRecord(uuid);
+        mmSocket = device.createRfcommSocketToServiceRecord(uuid);
         mmSocket.connect();
         mmOutputStream = mmSocket.getOutputStream();
         mmInputStream = mmSocket.getInputStream();
+        mmDevice = device;
 
         return true;
     }
@@ -95,14 +78,14 @@ public class FlutterBluetoothSerialPlusService {
 
     public void write(byte[] bytes) throws IOException {
 
-        if(mmDevice == null) return;
+        if (mmDevice == null) return;
 
         mmOutputStream.write(bytes);
     }
 
     public void disconnect() throws IOException {
 
-        if(mmDevice == null) return;
+        if (mmDevice == null) return;
 
         mmDevice = null;
         mmOutputStream.close();
@@ -111,9 +94,9 @@ public class FlutterBluetoothSerialPlusService {
     }
 
     public boolean bluetoothEnabled() {
-       if(mBluetoothAdapter == null) {
-           return false;
-       }
+        if (mBluetoothAdapter == null) {
+            return false;
+        }
 
         return mBluetoothAdapter.isEnabled();
     }
@@ -129,7 +112,7 @@ public class FlutterBluetoothSerialPlusService {
 
     public void enableBluetooth(Activity activity, EnableBluetoothCallback callback) {
 
-        if(mBluetoothAdapter == null) {
+        if (mBluetoothAdapter == null) {
             callback.execute(false);
             return;
         }
@@ -142,17 +125,43 @@ public class FlutterBluetoothSerialPlusService {
                     final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
                             BluetoothAdapter.ERROR);
 
-                    if(state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_OFF) {
+                    if (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_OFF) {
                         activity.unregisterReceiver(this);
                         callback.execute(state == BluetoothAdapter.STATE_ON);
+                    }
+                } else if(FlutterBluetoothSerialPlusPlugin.ACTION_FLUTTER_ACTIVITY_RESULT.equals(intent.getAction())) {
+
+                    int requestCode = intent.getIntExtra("requestCode", -1);
+                    int resultCode = intent.getIntExtra("resultCode", -1);
+
+                    if(requestCode == 1 && resultCode == Activity.RESULT_CANCELED) {
+                        activity.unregisterReceiver(this);
+                        callback.execute(false);
                     }
                 }
             }
         };
 
         activity.registerReceiver(bluetoothStateReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+        activity.registerReceiver(bluetoothStateReceiver, new IntentFilter(FlutterBluetoothSerialPlusPlugin.ACTION_FLUTTER_ACTIVITY_RESULT));
 
         Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
         activity.startActivityForResult(enableBtIntent, 1);
+    }
+
+    public byte[] read() throws IOException {
+        if (mmDevice == null) return null;
+
+        byte[] buffer = new byte[1024];
+        int bytesRead = mmInputStream.read(buffer);
+
+        if (bytesRead > 0) {
+            byte[] received = new byte[bytesRead];
+            System.arraycopy(buffer, 0, received, 0, bytesRead);
+
+            return received;
+        }
+
+        return null;
     }
 }

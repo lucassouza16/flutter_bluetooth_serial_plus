@@ -64,6 +64,11 @@ public class FlutterBluetoothSerialPlusFunctions {
     }
 
     public boolean hasPermissions(Activity activity) {
+
+        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.S){
+            return true;
+        }
+
         return ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
                 ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
     }
@@ -94,5 +99,13 @@ public class FlutterBluetoothSerialPlusFunctions {
 
     public void enableBluetooth (Activity activity, FlutterBluetoothSerialPlusService.EnableBluetoothCallback callback){
         service.enableBluetooth(activity, callback);
+    }
+
+    public byte[] read () {
+        try {
+            return service.read();
+        } catch (IOException e) {
+            return null;
+        }
     }
 }

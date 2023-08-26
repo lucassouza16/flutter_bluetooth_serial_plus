@@ -9,6 +9,7 @@ class FlutterBluetoothSerialPlus {
   static final FlutterBluetoothSerialPlus instance = FlutterBluetoothSerialPlus();
 
   final EventChannel _state = const EventChannel("flutter_bluetooth_serial_plus/stateChannel");
+  final EventChannel _readData = const EventChannel("flutter_bluetooth_serial_plus/readDataChannel");
 
   Future<List<BluetoothDevice>> get listDevices async {
     final devices = await methodChannel.invokeMethod<List<dynamic>>('listDevices');
@@ -51,4 +52,6 @@ class FlutterBluetoothSerialPlus {
   }
 
   Stream<BluetoothStateEvent> get state => _state.receiveBroadcastStream().map((event) => BluetoothStateEvent.fromMap(event));
+
+  Stream<Uint8List> get read => _readData.receiveBroadcastStream().map((event) => event as Uint8List);
 }
