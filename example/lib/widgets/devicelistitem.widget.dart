@@ -4,6 +4,7 @@ import 'package:flutter_bluetooth_serial_plus/flutter_bluetooth_serial_plus_mode
 class DeviceListItem extends StatelessWidget {
   final BluetoothDevice item;
   final BluetoothDevice? connecting;
+  final BluetoothDevice? connected;
   final Function(BluetoothDevice item) onSelect;
 
   const DeviceListItem({
@@ -11,11 +12,13 @@ class DeviceListItem extends StatelessWidget {
     required this.item,
     required this.onSelect,
     this.connecting,
+    this.connected,
   });
 
   @override
   Widget build(BuildContext context) {
     bool isConnecting = connecting == item;
+    bool isConnected = connected == item;
 
     return InkWell(
       onTap: () {
@@ -32,11 +35,17 @@ class DeviceListItem extends StatelessWidget {
               children: [
                 Text(
                   item.name,
-                  style: const TextStyle(
+                  style: TextStyle(
+                    color: isConnected ? Colors.blue : null,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(item.address),
+                Text(
+                  item.address,
+                  style: TextStyle(
+                    color: isConnected ? Colors.blue : null,
+                  ),
+                ),
               ],
             ),
           ),

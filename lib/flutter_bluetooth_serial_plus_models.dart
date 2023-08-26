@@ -38,7 +38,13 @@ class BluetoothStateEvent {
   static const int off = 2;
   static const int on = 3;
 
+  ///1. [BluetoothStateEvent.on] If bluetooth service was turn on
+  ///2. [BluetoothStateEvent.off] If bluetooth service was turn off
+  ///3. [BluetoothStateEvent.connect] If bluetooth device was connected
+  ///4. [BluetoothStateEvent.disconnect] If bluetooth device was disconnected
   final int state;
+
+  ///If status for state is [BluetoothStateEvent.on] or [BluetoothStateEvent.off], device is not null
   final BluetoothDevice? device;
 
   BluetoothStateEvent({

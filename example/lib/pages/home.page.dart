@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial_plus/flutter_bluetooth_serial_plus.dart';
 import 'package:flutter_bluetooth_serial_plus/flutter_bluetooth_serial_plus_models.dart';
 import 'package:flutter_bluetooth_serial_plus_example/widgets/devicelistitem.widget.dart';
 import 'package:flutter_bluetooth_serial_plus_example/pages/chat.page.dart';
+import 'package:flutter_bluetooth_serial_plus_example/widgets/messagelistitem.widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,37 +18,91 @@ class _HomePageState extends State<HomePage> {
   final _bluetoothPlugin = FlutterBluetoothSerialPlus.instance;
   List<BluetoothDevice> _devices = [];
   BluetoothDevice? _connecting;
+  BluetoothDevice? _connected;
+
+  final ValueNotifier<List<MessageModel>> _messages = ValueNotifier([]);
 
   @override
   void initState() {
     super.initState();
+
+    _bluetoothPlugin.connectedDevice.then((value) {
+      setState(() => _connected = value);
+    });
+
+    String buff = "";
+
+    _bluetoothPlugin.read.listen((event) {
+      String message = utf8.decode(event);
+      bool endRead = false;
+
+      buff += message;
+
+      if (buff.contains(RegExp(r'\n$'))) {
+        endRead = true;
+        buff = buff.replaceFirst(RegExp(r'\n$'), '');
+      }
+
+      if (endRead) {
+        _messages.value = [
+          MessageModel(
+            message: buff,
+            time: DateTime.now(),
+            type: MessageModel.isOther,
+          ),
+          ..._messages.value,
+        ];
+        buff = "";
+      }
+    });
 
     _bluetoothPlugin.state.listen(
       (event) {
         switch (event.state) {
           //If state is connect or disconnect, device bluettoth on event is not null
           case BluetoothStateEvent.connect:
-            debugPrint('Connected device: ${event.device}');
+            debugPrint('Connected device: ${event.device!.name}');
+            _messages.value = [
+              MessageModel(message: "Device ${event.device!.name} has connected", type: MessageModel.isInfo, time: DateTime.now()),
+              ..._messages.value,
+            ];
+            setState(() {
+              _connecting = null;
+              _connected = event.device;
+            });
             break;
           case BluetoothStateEvent.disconnect:
-            debugPrint('Disconnected device: ${event.device}');
-            setState(() => _connecting = null);
+            debugPrint('Disconnected device: ${event.device!.name}');
+            _messages.value = [
+              MessageModel(message: "Device ${event.device!.name} has disconnected", type: MessageModel.isInfo, time: DateTime.now()),
+              ..._messages.value,
+            ];
+            setState(() {
+              _connected = null;
+            });
             break;
           case BluetoothStateEvent.on:
             debugPrint('Bluetooth on');
             break;
           case BluetoothStateEvent.off:
             debugPrint('Bluetooth off');
-            setState(() => _connecting = null);
+            _messages.value = [
+              MessageModel(message: "Bluetooth device turn off, connection lost", type: MessageModel.isInfo, time: DateTime.now()),
+              ..._messages.value,
+            ];
+            setState(() {
+              _connecting = null;
+              _connected = null;
+            });
             break;
         }
       },
     );
 
-    initScanDevices();
+    _initScanDevices();
   }
 
-  Future<void> initScanDevices() async {
+  Future<void> _initScanDevices() async {
     if (!await _bluetoothPlugin.hasPermissions) {
       debugPrint("No bluetooth permission conceded, requesting...");
 
@@ -72,6 +129,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> connectDevice(BluetoothDevice device) async {
+    if (_connected != null) {
+      final scaffold = ScaffoldMessenger.of(context);
+      scaffold.showSnackBar(
+        const SnackBar(
+          content: Text('Device already connected'),
+        ),
+      );
+
+      return;
+    }
+
     setState(() => _connecting = device);
 
     if (await _bluetoothPlugin.connect(device)) {
@@ -79,12 +147,12 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const ChatPage()),
+          MaterialPageRoute(builder: (context) => ChatPage(messages: _messages)),
         );
       }
     } else {
-      setState(() => _connecting = null);
       debugPrint("Connection failed");
+      setState(() => _connecting = null);
     }
   }
 
@@ -94,22 +162,33 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('Connect to device'),
       ),
-      body: Column(children: [
-        Expanded(
-          child: ListView.builder(
-            itemCount: _devices.length,
-            itemBuilder: (context, index) {
-              var item = _devices[index];
+      body: RefreshIndicator(
+        onRefresh: _initScanDevices,
+        child: ListView.builder(
+          itemCount: _devices.length,
+          itemBuilder: (context, index) {
+            var item = _devices[index];
 
-              return DeviceListItem(
-                item: item,
-                connecting: _connecting,
-                onSelect: (item) => connectDevice(item),
-              );
-            },
-          ),
-        )
-      ]),
+            return DeviceListItem(
+              item: item,
+              connecting: _connecting,
+              connected: _connected,
+              onSelect: (item) => connectDevice(item),
+            );
+          },
+        ),
+      ),
+      floatingActionButton: _connected != null
+          ? FloatingActionButton(
+              child: const Icon(Icons.messenger_outline_outlined),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ChatPage(messages: _messages)),
+                );
+              },
+            )
+          : null,
     );
   }
 }
