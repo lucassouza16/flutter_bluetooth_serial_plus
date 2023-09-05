@@ -1,5 +1,6 @@
 package com.flutter.lucassouza.buetooth.serial.flutter_bluetooth_serial_plus;
 
+import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -7,10 +8,20 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import io.flutter.Log;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
@@ -27,17 +38,21 @@ public class FlutterBluetoothSerialPlusPlugin implements
         FlutterPlugin,
         ActivityAware,
         MethodCallHandler,
-        PluginRegistry.ActivityResultListener
-{
-    static String ACTION_FLUTTER_ACTIVITY_RESULT = "bluetooth.plugin.ACTION_FLUTTER_ACTIVITY_RESULT";
+        PluginRegistry.ActivityResultListener,
+        PluginRegistry.RequestPermissionsResultListener {
     Context context;
     private MethodChannel channel;
     private EventChannel eventStateChannel;
     private EventChannel eventReadDataChannel;
     private Activity activity;
-    private FlutterBluetoothSerialPlusFunctions functions = new FlutterBluetoothSerialPlusFunctions();
+    private FlutterBluetoothSerialPlusService service = new FlutterBluetoothSerialPlusService();
+
+    private Result requestPermissionsResult;
+    private Result enableBluetoothResult;
+
     private static final String TAG = FlutterBluetoothSerialPlusPlugin.class.getSimpleName();
-    private final EventChannel.StreamHandler stateStreamHandler = new EventChannel.StreamHandler(){
+
+    private final EventChannel.StreamHandler stateStreamHandler = new EventChannel.StreamHandler() {
 
         private EventChannel.EventSink sink;
         BroadcastReceiver bluetoothDeviceReceiver = new BroadcastReceiver() {
@@ -50,7 +65,7 @@ public class FlutterBluetoothSerialPlusPlugin implements
                     int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
 
                     if (state == BluetoothAdapter.STATE_OFF) {
-                        functions.disconnect();
+                        disconnect(null);
 
                         sink.success(
                                 FlutterBluetoothSerialPlusMapUtils.bluetoothStateToMap(2, null)
@@ -76,7 +91,7 @@ public class FlutterBluetoothSerialPlusPlugin implements
                         Log.d(TAG, "Device is about to disconnect");
                     } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
                         Log.d(TAG, "Device has disconnect");
-                        functions.disconnect();
+                        disconnect(null);
 
                         sink.success(
                                 FlutterBluetoothSerialPlusMapUtils.bluetoothStateToMap(1, device)
@@ -102,20 +117,27 @@ public class FlutterBluetoothSerialPlusPlugin implements
         }
     };
 
-    private final EventChannel.StreamHandler readDataStreamHandler = new EventChannel.StreamHandler(){
+    private final EventChannel.StreamHandler readDataStreamHandler = new EventChannel.StreamHandler() {
 
         private EventChannel.EventSink sink;
 
         Thread workerThread = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 if (sink != null) {
-                    byte[] readData = functions.read();
+                    byte[] readData = null;
 
-                    if(readData != null) {
+                    try {
+                        readData = service.read();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+                    if (readData != null) {
+                        byte[] finalReadData = readData;
                         new Handler(Looper.getMainLooper()).post(new Runnable() {
                             @Override
                             public void run() {
-                                sink.success(readData);
+                                sink.success(finalReadData);
                             }
                         });
                     }
@@ -127,7 +149,7 @@ public class FlutterBluetoothSerialPlusPlugin implements
         public void onListen(Object o, EventChannel.EventSink eventSink) {
             sink = eventSink;
 
-            if(!workerThread.isAlive()) {
+            if (!workerThread.isAlive()) {
                 workerThread.start();
             }
         }
@@ -135,6 +157,24 @@ public class FlutterBluetoothSerialPlusPlugin implements
         @Override
         public void onCancel(Object o) {
             sink = null;
+        }
+    };
+
+    private final BroadcastReceiver bluetoothStateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(intent.getAction())) {
+
+                final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
+                        BluetoothAdapter.ERROR);
+
+                if (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_OFF) {
+                    if(enableBluetoothResult != null) {
+                        enableBluetoothResult.success(state == BluetoothAdapter.STATE_ON);
+                        enableBluetoothResult = null;
+                    }
+                }
+            }
         }
     };
 
@@ -154,26 +194,123 @@ public class FlutterBluetoothSerialPlusPlugin implements
         channel.setMethodCallHandler(this);
     }
 
+    private void requestPermissions(Result result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            result.success(true);
+        } else {
+            requestPermissionsResult = result;
+
+            ActivityCompat.requestPermissions(activity, new String[]{
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_CONNECT
+            }, 2);
+        }
+    }
+
+    public void enableBluetooth(Result result) {
+        if (!service.hasAdapter()) {
+            result.success(false);
+            return;
+        }
+
+        enableBluetoothResult = result;
+
+        Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+        activity.startActivityForResult(enableBtIntent, 1);
+    }
+
+    public void listDevices(Result result) {
+        List<BluetoothDevice> devices = service.list();
+        List<Map<String, Object>> devicesMap = new ArrayList<>();
+
+        for (BluetoothDevice device: devices) {
+            devicesMap.add(FlutterBluetoothSerialPlusMapUtils.bluetoothDeviceToMap(device));
+        }
+
+        result.success(devicesMap);
+    }
+
+    public void connect(MethodCall call, Result result) {
+        BluetoothDevice device = service.findDevice(call.arguments());
+
+        if(device == null) {
+            result.success(false);
+        } else {
+            try {
+                result.success(service.connect(device));
+            } catch (IOException e) {
+                result.success(false);
+            }
+        }
+    }
+
+    public void disconnect(Result result) {
+        try{
+            service.disconnect();
+
+            if(result != null) result.success(true);
+        } catch (IOException e){
+            if(result != null) result.success(false);
+        }
+    }
+
+    public void write(MethodCall call, Result result) {
+        try{
+            service.write(call.arguments());
+
+            result.success(true);
+        }catch (IOException e){
+            e.printStackTrace();
+            result.success(false);
+        }
+    }
+
+    public void hasPermissions(Result result) {
+
+        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.S){
+            result.success(true);
+            return;
+        }
+
+        result.success(ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED);
+    }
+
+    public void isBluetoothEnabled(Result result){
+        result.success(service.bluetoothEnabled());
+    }
+
+    public void connectedDevice(Result result){
+        BluetoothDevice actual = service.connectedDevice();
+
+        if(actual == null) {
+            result.success(null);
+            return;
+        }
+
+        result.success(FlutterBluetoothSerialPlusMapUtils.bluetoothDeviceToMap(actual));
+    }
+
     @Override
     public void onMethodCall(MethodCall call, Result result) {
         if (call.method.equals("listDevices")) {
-            result.success(functions.listDevices());
+            listDevices(result);
         } else if (call.method.equals("connect")) {
-            result.success(functions.connect(call.arguments()));
+            connect(call, result);
         } else if (call.method.equals("disconnect")) {
-            result.success(functions.disconnect());
+            disconnect(result);
         } else if (call.method.equals("write")) {
-            result.success(functions.write(call.arguments()));
+            write(call, result);
         } else if (call.method.equals("hasPermissions")) {
-            result.success(functions.hasPermissions(activity));
-        } else if (call.method.equals("requestPermissions")) {
-            result.success(functions.requestPermissions(activity));
+            hasPermissions(result);
         } else if (call.method.equals("isBluetoothEnabled")) {
-            result.success(functions.isBluetoothEnabled());
+            isBluetoothEnabled(result);
+        } else if (call.method.equals("requestPermissions")) {
+            requestPermissions(result);
         } else if (call.method.equals("enableBluetooth")) {
-            functions.enableBluetooth(activity, enabled -> result.success(enabled));
+            enableBluetooth(result);
         } else if (call.method.equals("connectedDevice")) {
-            result.success(functions.connectedDevice());
+            connectedDevice(result);
         } else {
             result.notImplemented();
         }
@@ -189,7 +326,11 @@ public class FlutterBluetoothSerialPlusPlugin implements
         //Log.d(TAG, "onAttachedToActivity");
 
         activity = activityPluginBinding.getActivity();
+
+        activity.registerReceiver(bluetoothStateReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+
         activityPluginBinding.addActivityResultListener(this);
+        activityPluginBinding.addRequestPermissionsResultListener(this);
     }
 
     @Override
@@ -204,17 +345,33 @@ public class FlutterBluetoothSerialPlusPlugin implements
 
     @Override
     public void onDetachedFromActivity() {
-
+        activity.unregisterReceiver(bluetoothStateReceiver);
     }
 
     @Override
     public boolean onActivityResult(int requestCode, int resultCode, @Nullable Intent intent) {
+        if(requestCode == 1) {
+            if(enableBluetoothResult != null) {
+                enableBluetoothResult.success(resultCode != Activity.RESULT_CANCELED);
+                enableBluetoothResult = null;
+            }
 
-        Intent resultIntent = new Intent();
-        resultIntent.setAction(ACTION_FLUTTER_ACTIVITY_RESULT);
-        resultIntent.putExtra("requestCode", requestCode);
-        resultIntent.putExtra("resultCode", resultCode);
-        context.sendBroadcast(resultIntent);
+            return true;
+        }
+
+        return false;
+    }
+
+    @Override
+    public boolean onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if(requestCode == 2) {
+            if(requestPermissionsResult != null) {
+                requestPermissionsResult.success(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED);
+                requestPermissionsResult = null;
+            }
+
+            return true;
+        }
 
         return false;
     }

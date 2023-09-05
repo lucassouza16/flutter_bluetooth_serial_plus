@@ -35,7 +35,7 @@ public class FlutterBluetoothSerialPlusService {
 
         List<BluetoothDevice> devices = new ArrayList();
 
-        if (mBluetoothAdapter == null) {
+        if (!hasAdapter()) {
             Log.d(TAG, "No bluetooth adapter available");
             return devices;
         }
@@ -93,8 +93,12 @@ public class FlutterBluetoothSerialPlusService {
         mmSocket.close();
     }
 
+    public boolean hasAdapter() {
+        return mBluetoothAdapter != null;
+    }
+
     public boolean bluetoothEnabled() {
-        if (mBluetoothAdapter == null) {
+        if (!hasAdapter()) {
             return false;
         }
 
@@ -103,50 +107,6 @@ public class FlutterBluetoothSerialPlusService {
 
     public BluetoothDevice connectedDevice() {
         return this.mmDevice;
-    }
-
-    @FunctionalInterface
-    public interface EnableBluetoothCallback {
-        void execute(boolean enabled);
-    }
-
-    public void enableBluetooth(Activity activity, EnableBluetoothCallback callback) {
-
-        if (mBluetoothAdapter == null) {
-            callback.execute(false);
-            return;
-        }
-
-        final BroadcastReceiver bluetoothStateReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(intent.getAction())) {
-
-                    final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
-                            BluetoothAdapter.ERROR);
-
-                    if (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_OFF) {
-                        activity.unregisterReceiver(this);
-                        callback.execute(state == BluetoothAdapter.STATE_ON);
-                    }
-                } else if(FlutterBluetoothSerialPlusPlugin.ACTION_FLUTTER_ACTIVITY_RESULT.equals(intent.getAction())) {
-
-                    int requestCode = intent.getIntExtra("requestCode", -1);
-                    int resultCode = intent.getIntExtra("resultCode", -1);
-
-                    if(requestCode == 1 && resultCode == Activity.RESULT_CANCELED) {
-                        activity.unregisterReceiver(this);
-                        callback.execute(false);
-                    }
-                }
-            }
-        };
-
-        activity.registerReceiver(bluetoothStateReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
-        activity.registerReceiver(bluetoothStateReceiver, new IntentFilter(FlutterBluetoothSerialPlusPlugin.ACTION_FLUTTER_ACTIVITY_RESULT));
-
-        Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-        activity.startActivityForResult(enableBtIntent, 1);
     }
 
     public byte[] read() throws IOException {
